@@ -1,11 +1,11 @@
 const { chromium } = require('playwright');
 const chalk = require('chalk');
-const CustomExcelReader = require('./custom-excel-reader');
+const TestExcelReader = require('./test-excel-reader');
 const fs = require('fs');
 const path = require('path');
 const { format } = require('date-fns');
 
-class StudentQAAutomation {
+class TestAutomation {
     constructor(options = {}) {
         this.headless = process.env.HEADLESS !== 'false';
         this.browser = null;
@@ -16,6 +16,11 @@ class StudentQAAutomation {
         this.reportDir = './reports';
         
         this.credentials = {
+            admin: {
+                email: 'kaphlenerob@gmail.com',
+                password: 'applynote123',
+                url: 'https://console.applynote.com/login'
+            },
             student: {
                 email: 'kaphleraj98@gmail.com',
                 password: 'defaultpassword',
@@ -23,18 +28,23 @@ class StudentQAAutomation {
             }
         };
 
-        // Student-specific selectors
+        // Enhanced selectors for both admin and student
         this.selectors = {
-            // Login selectors
             login: {
                 email: [
                     'input[type="email"]',
                     'input[name="email"]',
                     'input[placeholder*="email" i]',
                     'input[id*="email" i]',
+                    'input[placeholder*="Email" i]',
+                    'input[name*="email" i]',
+                    'input[class*="email" i]',
                     '//input[@type="email"]',
                     '//input[contains(@placeholder, "email")]',
-                    '//input[contains(@name, "email")]'
+                    '//input[contains(@name, "email")]',
+                    '//input[contains(@placeholder, "Email")]',
+                    '//input[contains(@name, "email")]',
+                    '//input[contains(@class, "email")]'
                 ],
                 password: [
                     'input[type="password"]',
@@ -55,77 +65,42 @@ class StudentQAAutomation {
                     '//button[contains(text(), "Login")]',
                     '//button[contains(text(), "Sign In")]',
                     '//input[@type="submit"]'
+                ],
+                otp: [
+                    'input[placeholder*="OTP" i]',
+                    'input[name="otp"]',
+                    'input[id*="otp" i]',
+                    'input[maxlength="6"]',
+                    'input[maxlength="4"]',
+                    '//input[contains(@placeholder, "OTP")]',
+                    '//input[@name="otp"]',
+                    '//input[contains(@id, "otp")]'
                 ]
             },
-            // Student navigation selectors
-            navigation: {
-                dashboard: [
-                    'nav a:has-text("Dashboard")',
-                    'a:has-text("Dashboard")',
-                    '//a[contains(text(), "Dashboard")]',
-                    '//nav//a[contains(text(), "Dashboard")]'
+            common: {
+                button: [
+                    'button',
+                    'input[type="button"]',
+                    'input[type="submit"]',
+                    '.btn',
+                    '//button',
+                    '//input[@type="button"]',
+                    '//input[@type="submit"]'
                 ],
-                courses: [
-                    'nav a:has-text("Courses")',
-                    'a:has-text("Courses")',
-                    'button:has-text("Courses")',
-                    '//a[contains(text(), "Courses")]',
-                    '//button[contains(text(), "Courses")]'
-                ],
-                assignments: [
-                    'nav a:has-text("Assignments")',
-                    'a:has-text("Assignments")',
-                    'button:has-text("Assignments")',
-                    '//a[contains(text(), "Assignments")]',
-                    '//button[contains(text(), "Assignments")]'
-                ],
-                profile: [
-                    'nav a:has-text("Profile")',
-                    'a:has-text("Profile")',
-                    'button:has-text("Profile")',
-                    '//a[contains(text(), "Profile")]',
-                    '//button[contains(text(), "Profile")]'
-                ],
-                grades: [
-                    'nav a:has-text("Grades")',
-                    'a:has-text("Grades")',
-                    'button:has-text("Grades")',
-                    '//a[contains(text(), "Grades")]',
-                    '//button[contains(text(), "Grades")]'
-                ]
-            },
-            // Student form selectors
-            forms: {
-                assignment_upload: [
-                    'input[type="file"]',
-                    'input[accept*="pdf"]',
-                    'input[accept*="doc"]',
-                    '//input[@type="file"]',
-                    '//input[contains(@accept, "pdf")]'
-                ],
-                text_input: [
+                input: [
                     'input[type="text"]',
-                    'textarea',
                     'input[type="email"]',
+                    'textarea',
                     'input:not([type="checkbox"]):not([type="radio"])',
                     '//input[@type="text"]',
+                    '//input[@type="email"]',
                     '//textarea'
                 ],
-                dropdown: [
-                    'select',
-                    'select[formcontrolname]',
-                    '.dropdown',
-                    '//select',
-                    '//div[contains(@class, "dropdown")]'
-                ],
-                submit_button: [
-                    'button[type="submit"]',
-                    'button:has-text("Submit")',
-                    'button:has-text("Upload")',
-                    'input[type="submit"]',
-                    '//button[@type="submit"]',
-                    '//button[contains(text(), "Submit")]',
-                    '//button[contains(text(), "Upload")]'
+                link: [
+                    'a',
+                    'a[href]',
+                    '//a',
+                    '//a[@href]'
                 ]
             }
         };
@@ -192,36 +167,54 @@ class StudentQAAutomation {
         throw new Error(`Element not found with any selector: ${selectorList.join(', ')}`);
     }
 
-    async login() {
-        const creds = this.credentials.student;
-        console.log(chalk.blue(`\nLogging into student app with email: ${creds.email}`));
+    async login(appType) {
+        const creds = this.credentials[appType];
+        console.log(chalk.blue(`\nLogging into ${appType} app with email: ${creds.email}`));
         
         await this.page.goto(creds.url, { waitUntil: 'networkidle', timeout: 30000 });
-        await this.takeScreenshot('student-login-page');
+        await this.takeScreenshot(`${appType}-login-page`);
         
         try {
+            // Find and fill email field
             const emailElement = await this.findElement(this.selectors.login.email);
             await emailElement.fill(creds.email);
             console.log(chalk.green('Email entered successfully'));
             await this.page.waitForTimeout(1000);
             
+            // Find and fill password field
             const passwordElement = await this.findElement(this.selectors.login.password);
             await passwordElement.fill(creds.password);
             console.log(chalk.green('Password entered successfully'));
             await this.page.waitForTimeout(1000);
             
+            // Find and click submit button
             const submitElement = await this.findElement(this.selectors.login.submit);
             await submitElement.click();
             console.log(chalk.green('Login button clicked'));
             await this.page.waitForTimeout(3000);
             
-            await this.takeScreenshot('student-after-login');
-            console.log(chalk.green('Successfully logged into student app'));
+            await this.takeScreenshot(`${appType}-after-login`);
+            
+            // Check if OTP is required
+            try {
+                const otpElement = await this.findElement(this.selectors.login.otp, 2000);
+                console.log(chalk.yellow('OTP required. Please enter OTP manually...'));
+                console.log(chalk.cyan('You have 2 minutes to enter the OTP. Press Enter when done...'));
+                
+                // Wait for manual OTP entry (2 minutes)
+                await this.page.waitForTimeout(120000);
+                
+                await this.takeScreenshot(`${appType}-after-otp`);
+            } catch (e) {
+                console.log(chalk.green('No OTP required - login successful'));
+            }
+            
+            console.log(chalk.green(`Successfully logged into ${appType} app`));
             return true;
             
         } catch (error) {
-            await this.takeScreenshot('student-login-error');
-            throw new Error(`Student login failed: ${error.message}`);
+            await this.takeScreenshot(`${appType}-login-error`);
+            throw new Error(`Login failed: ${error.message}`);
         }
     }
 
@@ -262,6 +255,9 @@ class StudentQAAutomation {
                 case 'press':
                     await this.page.press(selector, value);
                     break;
+                case 'hover':
+                    await this.page.hover(selector, { timeout: 10000 });
+                    break;
                 case 'upload':
                     await this.page.setInputFiles(selector, value);
                     break;
@@ -275,11 +271,71 @@ class StudentQAAutomation {
         }
     }
 
-    async runStudentTests(excelPath, sheetName = 'Student WEB UI') {
-        const excelReader = new CustomExcelReader(excelPath);
-        const testCases = excelReader.getTestCases(sheetName);
+    // Parse test steps from your Excel format
+    parseTestSteps(testSteps) {
+        const steps = [];
+        const lines = testSteps.split('.').filter(line => line.trim());
         
-        console.log(chalk.cyan(`\nFound ${testCases.length} student test cases in ${sheetName}`));
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            const step = {
+                action: '',
+                selector: '',
+                value: '',
+                description: trimmedLine
+            };
+            
+            // Parse different step patterns
+            if (trimmedLine.toLowerCase().includes('navigate')) {
+                step.action = 'navigate';
+                const urlMatch = trimmedLine.match(/navigate\s+to\s+(.+?)(?:\.|$)/i);
+                if (urlMatch) {
+                    step.value = urlMatch[1];
+                }
+            } else if (trimmedLine.toLowerCase().includes('enter') || trimmedLine.toLowerCase().includes('type')) {
+                step.action = 'type';
+                // Extract email
+                const emailMatch = trimmedLine.match(/enter\s+email:\s*(.+?)(?:\.|$)/i);
+                if (emailMatch) {
+                    step.value = emailMatch[1];
+                    step.selector = this.selectors.login.email.join(', ');
+                }
+                // Extract password
+                const passwordMatch = trimmedLine.match(/enter\s+password:\s*(.+?)(?:\.|$)/i);
+                if (passwordMatch) {
+                    step.value = passwordMatch[1];
+                    step.selector = this.selectors.login.password.join(', ');
+                }
+            } else if (trimmedLine.toLowerCase().includes('click')) {
+                step.action = 'click';
+                step.selector = this.selectors.login.submit.join(', ');
+            } else if (trimmedLine.toLowerCase().includes('upload')) {
+                step.action = 'upload';
+                step.selector = 'input[type="file"]';
+            } else if (trimmedLine.toLowerCase().includes('wait')) {
+                step.action = 'wait';
+                step.value = '2000';
+            }
+            
+            if (step.action) {
+                steps.push(step);
+            }
+        }
+        
+        return steps;
+    }
+
+    async runTestCases(excelPath, testType = 'admin') {
+        const excelReader = new TestExcelReader(excelPath);
+        let testCases;
+        
+        if (testType === 'test') {
+            testCases = excelReader.getTESTTestCases();
+            console.log(chalk.cyan(`\nFound ${testCases.length} TEST 01-198 test cases`));
+        } else {
+            testCases = excelReader.getAdminTestCases();
+            console.log(chalk.cyan(`\nFound ${testCases.length} admin test cases`));
+        }
         
         for (const testCase of testCases) {
             if (!testCase.enabled) {
@@ -299,27 +355,30 @@ class StudentQAAutomation {
             };
 
             try {
-                // Student-specific UI compliance testing
-                await this.takeScreenshot(`student-ui-${testCase.test_case_id}`);
-                console.log(chalk.blue('Student UI compliance check - screenshot taken'));
-                
-                // Verify student-specific elements
-                if (testCase.module_component) {
-                    console.log(chalk.blue(`Testing component: ${testCase.module_component}`));
+                if (testCase.test_steps) {
+                    console.log(chalk.blue(`Test Steps: ${testCase.test_steps}`));
                     
-                    // Try to find related elements
-                    const componentLower = testCase.module_component.toLowerCase();
-                    if (componentLower.includes('dashboard')) {
-                        await this.executeAction('waitfor', this.selectors.navigation.dashboard.join(', '));
-                    } else if (componentLower.includes('course')) {
-                        await this.executeAction('waitfor', this.selectors.navigation.courses.join(', '));
-                    } else if (componentLower.includes('assignment')) {
-                        await this.executeAction('waitfor', this.selectors.navigation.assignments.join(', '));
-                    } else if (componentLower.includes('profile')) {
-                        await this.executeAction('waitfor', this.selectors.navigation.profile.join(', '));
-                    } else if (componentLower.includes('grade')) {
-                        await this.executeAction('waitfor', this.selectors.navigation.grades.join(', '));
+                    const steps = this.parseTestSteps(testCase.test_steps);
+                    console.log(chalk.blue(`Parsed ${steps.length} steps`));
+                    
+                    for (const step of steps) {
+                        console.log(chalk.cyan(`  -> ${step.description}`));
+                        
+                        if (step.action === 'navigate') {
+                            await this.page.goto(step.value, { waitUntil: 'networkidle' });
+                        } else if (step.selector) {
+                            await this.executeAction(step.action, step.selector, step.value);
+                        } else {
+                            await this.page.waitForTimeout(1000);
+                        }
+                        
+                        // Take screenshot after each step
+                        await this.takeScreenshot(`step-${testCase.test_case_id}-${steps.indexOf(step)}`);
                     }
+                } else {
+                    // Take screenshot for UI compliance tests
+                    await this.takeScreenshot(`ui-check-${testCase.test_case_id}`);
+                    console.log(chalk.blue('UI compliance check - screenshot taken'));
                 }
 
                 console.log(chalk.green(`\u2705 Passed: ${testCase.test_case_id}`));
@@ -345,7 +404,7 @@ class StudentQAAutomation {
         const total = this.testResults.length;
 
         console.log(chalk.cyan('\n\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550'));
-        console.log(chalk.cyan('         STUDENT QA TEST SUMMARY        '));
+        console.log(chalk.cyan('           TEST EXECUTION SUMMARY        '));
         console.log(chalk.cyan('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550'));
         console.log(chalk.white(`Total Test Cases: ${total}`));
         console.log(chalk.green(`Passed:           ${passed}`));
@@ -353,10 +412,10 @@ class StudentQAAutomation {
         console.log(chalk.yellow(`Success Rate:     ${((passed/total)*100).toFixed(2)}%`));
         console.log(chalk.cyan('\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550'));
 
-        const reportPath = path.join(this.reportDir, `student-qa-report-${format(new Date(), 'yyyyMMdd-HHmmss')}.json`);
+        const reportPath = path.join(this.reportDir, `test-report-${format(new Date(), 'yyyyMMdd-HHmmss')}.json`);
         fs.writeFileSync(reportPath, JSON.stringify(this.testResults, null, 2));
-        console.log(chalk.blue(`\nStudent QA report saved to: ${reportPath}`));
+        console.log(chalk.blue(`\nFull report saved to: ${reportPath}`));
     }
 }
 
-module.exports = StudentQAAutomation;
+module.exports = TestAutomation;
