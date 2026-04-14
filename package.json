@@ -1,0 +1,45 @@
+{
+  "name": "applynote-qa-automation",
+  "version": "1.0.0",
+  "description": "QA Automation framework for ApplyNote using Excel test cases",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test-runner.js",
+    "test:headed": "HEADLESS=false node test-runner.js",
+    "test:student": "node test-runner.js --app student",
+    "test:admin-old": "node test-runner.js --app admin",
+    "login:test": "node run-automation.js",
+    "login:test:headed": "HEADLESS=false node run-automation.js",
+    "login:test:admin": "node run-automation.js --app admin",
+    "login:test:student": "node run-automation.js --app student",
+    "test:admin": "node run-specific-tests.js --sheet Admin",
+    "test:website": "node run-specific-tests.js --sheet Website",
+    "test:student-web": "node run-specific-tests.js --sheet \"Student WEB UI\"",
+    "test:student-app": "node run-specific-tests.js --sheet \"Application Student\"",
+    "excel:test": "node run-excel-tests.js",
+    "excel:test:admin": "node run-excel-tests.js --sheet Admin",
+    "excel:test:website": "node run-excel-tests.js --sheet Website",
+    "excel:test:student-web": "node run-excel-tests.js --sheet \"Student WEB UI\"",
+    "excel:test:student-app": "node run-excel-tests.js --sheet \"Application Student\"",
+    "admin:qa": "node admin-qa-runner.js",
+    "admin:qa:headed": "HEADLESS=false node admin-qa-runner.js",
+    "student:qa": "node student-qa-runner.js",
+    "student:qa:headed": "HEADLESS=false node student-qa-runner.js",
+    "website:qa": "node website-qa-runner.js",
+    "website:qa:headed": "HEADLESS=false node website-qa-runner.js",
+    "pw:test": "playwright test",
+    "pw:test:headed": "playwright test --headed",
+    "pw:test:chrome:headed": "playwright test --project=chrome --headed",
+    "pw:report": "playwright show-report"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0",
+    "xlsx": "^0.18.5",
+    "chalk": "^4.1.2",
+    "cli-table3": "^0.6.5",
+    "date-fns": "^3.6.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  }
+}
